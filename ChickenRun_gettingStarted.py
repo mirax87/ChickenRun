@@ -1,30 +1,60 @@
 import os
 import pygame
-import time
+import pytmx
+import sys
 
-from ChickenRun.src.Chicken2D import Chicken
+
+from ChickenRun.src.Chicken2D import Chicken2D
+from ChickenRun.src.LoadLevelCommand import LoadLevelCommand
+
+
+class Tile(pygame.sprite.Sprite):
+    def __init__(self, pos, surf, groups):
+        super().__init__(groups)
+        self.image = surf
+        self.rect = self.image.get_rect(topleft = pos)
+
+def collision_sprite(chicken, obstacles):
+	if pygame.sprite.spritecollide(chicken, obstacles, False):
+		return True
+	else: 
+		return False
+
 from ChickenRun.src.Rooms import Room
-
-
-chickenTexture = pygame.image.load("ChickenRun\\assets\\chicken\\chicken\\chickenprofilewalkx4.gif")
 
 os.environ['SDL_VIDEO_CENTERED'] = '1'
 pygame.init()
 
-window = pygame.display.set_mode((256*2,256*2))
+screen = pygame.display.set_mode((256*2, 256*2))
 clock = pygame.time.Clock()
 
-room = Room(16, 24, 24)
+# Maps: store multiple paths, load on demand.
+map_path = os.path.join('ChickenRun', 'Maps', 'Test_map1.tmx')
+tmx_data = pytmx.util_pygame.load_pygame(map_path)
 
-x0 = 120
-y0 = 120
-chicken = Chicken((x0, y0),(120,150), chickenTexture)
+tiledim = [tmx_data.tilewidth, tmx_data.tileheight]
 
-window.fill((0,0,0))
-room.draw((50,50), window)
-    
+
+groundTiles = pygame.sprite.Group()
+
+for x, y, surf in tmx_data.get_layer_by_name('ground').tiles():
+    pos = x * tiledim[0], y * tiledim[1]
+    Tile(pos, surf, groundTiles)
+
+
+exitTiles = pygame.sprite.Group()
+
+for x, y, surf in tmx_data.get_layer_by_name('exits').tiles():
+    pos = x * tiledim[0], y * tiledim[1]
+    Tile(pos, surf, exitTiles)
+
+chicken2d_sprite = Chicken2D()
+chicken2d_sprite.spawn((100, 100))
+chicken = pygame.sprite.GroupSingle(chicken2d_sprite)
+
 running = True
 while running:
+    # global event loop
     eventList = pygame.event.get()
     for event in eventList:
         if event.type == pygame.QUIT:
@@ -33,17 +63,25 @@ while running:
             if event.key == pygame.K_ESCAPE:
                 running = False
                 break
-            chicken.move(event)
 
-    room.draw((50,50), window)
-    window.blit(chicken.texture, chicken.position, room)
-    
-    # pygame.draw.rect(window,(0, 140, 140),
-    #     (chicken.x,chicken.y,chicken.width,chicken.height))
-    
+    # Create the World
+    groundTiles.draw(screen)
+    exitTiles.draw(screen)
+
+    # create Chicken
+    if collision_sprite(chicken.sprite, exitTiles):
+        chicken.update(exitTiles)
+    else:
+        chicken.update()
+
+    chicken.draw(screen)
+
+    # chicken.colliderect(exitTiles)
     pygame.display.update()
 
-    # clock.tick(60)
-    # time.sleep(1)
+    
+         
 
+    clock.tick(60)
+    
 pygame.quit()
